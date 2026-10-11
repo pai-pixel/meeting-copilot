@@ -1,0 +1,49 @@
+name: Build Intel macOS DMG
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-13
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - name: Check Rust toolchain
+        run: rustc --version && cargo --version && swift --version
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build Tauri app (Intel macOS)
+        run: pnpm tauri build
+
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: meeting-copilot-intel-dmg
+          path: src-tauri/target/release/bundle/dmg/*.dmg
+
+      - name: Create GitHub Release with DMG
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          DMG=$(ls src-tauri/target/release/bundle/dmg/*.dmg | head -n 1)
+          echo "DMG: $DMG"
+          gh release create "intel-v0.1.0-run${{ github.run_number }}" "$DMG" \
+            --title "Meeting Copilot v0.1.0 (Intel Mac)" \
+            --notes "从源码在 macos-13 (Intel) 云编译机上构建的 DMG，适用于 Intel 芯片 Mac。首次打开请右键 -> 打开。需要 DashScope key + LLM key 才能使用。"
